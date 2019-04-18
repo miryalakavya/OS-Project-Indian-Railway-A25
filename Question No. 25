@@ -76,3 +76,28 @@ void* load_train_thread(void *args)
         load_train_returned = 1;
         return NULL;
 }
+const char* alarm_error_str;
+int alarm_timeout;
+void _alarm(int seconds, const char *error_str)
+{
+        alarm_timeout = seconds;
+        alarm_error_str = error_str;
+        alarm(seconds);
+}
+
+void alarm_handler(int foo)
+{
+        fprintf(stderr, "Error: Failed to complete after %d seconds. Something's "
+                "wrong, or your system is terribly slow. Possible error hint: [%s]\n",
+                alarm_timeout, alarm_error_str);
+        exit(1);
+}
+#ifndef MIN
+#define MIN(_x,_y) ((_x) < (_y)) ? (_x) : (_y)
+#endif
+
+
+
+
+
+
