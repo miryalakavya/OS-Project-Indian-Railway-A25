@@ -27,3 +27,52 @@ void station_init(struct station *station)
   pthread_cond_init(&(station->train_is_full_cond), NULL);
 }
 void station_load_train(struct station *station, int count)
+{
+  pthread_mutex_lock(&(station->lock));
+  while ((station->out_p> 0) && (count > 0)){
+    pthread_cond_signal(&(station->train_arrived_cond));
+        count--;
+        pthread_cond_wait(&(station->passengers_seated_cond), &(station->lock));
+  }
+  if (station->in_p> 0)
+        pthread_cond_wait(&(station->train_is_full_cond), &(station->lock));
+  pthread_mutex_unlock(&(station->lock));
+}
+void station_wait_for_train(struct station *station)
+{
+  pthread_mutex_lock(&(station->lock));
+  station->out_p++;
+  pthread_cond_wait(&(station->train_arrived_cond), &(station->lock));
+  station->out_p--;
+  station->in_p++;
+  pthread_mutex_unlock(&(station->lock));
+  pthread_cond_signal(&(station->passengers_seated_cond));
+}
+void station_on_board(struct station *station)
+{
+  pthread_mutex_lock(&(station->lock));
+  station->in_p--;
+   pthread_mutex_unlock(&(station->lock));
+  if (station->in_p== 0)
+        pthread_cond_broadcast(&(station->train_is_full_cond));
+}
+volatile int threads_completed = 0;
+void *passenger_thread(void *arg)
+{
+        struct station *station = (struct station*)arg;
+        station_wait_for_train(station);
+        __sync_add_and_fetch(&threads_completed, 1);
+        return NULL;
+}
+struct load_train_args {
+        struct station *station;
+        int free_seats;
+};
+volatile int load_train_returned = 0;
+void* load_train_thread(void *args)
+{
+        struct load_train_args *ltargs = (struct load_train_args*)args;
+        station_load_train(ltargs->station, ltargs->free_seats);
+        load_train_returned = 1;
+        return NULL;
+}
